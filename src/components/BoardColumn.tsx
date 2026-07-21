@@ -2,6 +2,7 @@ import CardItem from "./CardItem";
 import type { Card } from "../api/cardApi";
 
 type Props = {
+  index: string;
   title: string;
   cards: Card[];
   onDelete: (id: number) => void;
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export default function BoardColumn({
+  index,
   title,
   cards,
   onDelete,
@@ -18,14 +20,14 @@ export default function BoardColumn({
 }: Props) {
   return (
     <div className="column">
+      <div className="column-head">
+        <span className="column-index">{index}</span>
+        <h2>{title}</h2>
+        <span className="column-count">{cards.length}</span>
+      </div>
 
-      <h2>{title}</h2>
-
-      <button
-        className="add-card-btn"
-        onClick={onAdd}
-      >
-        + Add Card
+      <button className="add-card-btn" onClick={onAdd}>
+        + Add card
       </button>
 
       {cards.map((card) => (
@@ -36,7 +38,6 @@ export default function BoardColumn({
           onEdit={onEdit}
         />
       ))}
-
     </div>
   );
 }

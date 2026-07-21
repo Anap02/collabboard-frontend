@@ -32,6 +32,7 @@ export default function Login() {
   return (
     <div className="auth-container">
       <form className="auth-box" onSubmit={handleSubmit}>
+        <span className="auth-eyebrow">Task board, wired for real time</span>
         <h1>CollabBoard</h1>
         <h2>Login</h2>
 
@@ -51,7 +52,9 @@ export default function Login() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        <button type="submit">Login</button>
+        <button className="primary" type="submit">
+          Login
+        </button>
 
         <p>
           Nu ai cont? <Link to="/register">Înregistrează-te</Link>

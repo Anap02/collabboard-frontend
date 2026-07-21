@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import BoardColumn from "../components/BoardColumn";
+import CardModal from "../components/CardModal";
 import { socket } from "../api/socket";
 
 import type { Board } from "../api/boardApi";
@@ -15,43 +16,23 @@ import {
   deleteBoard,
 } from "../api/boardApi";
 
-import {
-  getCardsByBoard,
-  deleteCard,
-  updateCard,
-   createCard,
-} from "../api/cardApi";
+import { getCardsByBoard, deleteCard } from "../api/cardApi";
 
 export default function Dashboard() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [selectedBoard, setSelectedBoard] = useState<Board | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
+  const [connected, setConnected] = useState(false);
 
   const [newBoard, setNewBoard] = useState("");
-
   const [editingBoard, setEditingBoard] = useState<Board | null>(null);
   const [editTitle, setEditTitle] = useState("");
 
-  const [editingCard, setEditingCard] =
-    useState<Card | null>(null);
-
-const [cardTitle, setCardTitle] =
-    useState("");
-
-const [cardDescription, setCardDescription] =
-    useState("");
-
-const [cardStatus, setCardStatus] =
-    useState<"TODO"|"IN_PROGRESS"|"DONE">("TODO");
-const [newCardTitle, setNewCardTitle] = useState("");
-const [newCardDescription, setNewCardDescription] = useState("");
-const [newCardStatus, setNewCardStatus] = useState<
-  "TODO" | "IN_PROGRESS" | "DONE"
->("TODO");    
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingCard, setEditingCard] = useState<Card | null>(null);
 
   async function loadBoards() {
     const res = await getBoards();
-
     setBoards(res.data);
 
     if (res.data.length > 0 && !selectedBoard) {
@@ -66,6 +47,7 @@ const [newCardStatus, setNewCardStatus] = useState<
 
   useEffect(() => {
     loadBoards();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -74,25 +56,33 @@ const [newCardStatus, setNewCardStatus] = useState<
     }
   }, [selectedBoard]);
 
+  // Conexiune WebSocket autentificată (JWT trimis în handshake).
+  // Indicatorul "Live"/"Offline" din Navbar reflectă starea reală a socket-ului.
   useEffect(() => {
-  socket.auth = {
-    token: localStorage.getItem("token"),
-  };
+    socket.auth = {
+      token: localStorage.getItem("token"),
+    };
 
-  socket.connect();
+    socket.connect();
 
-  return () => {
-    socket.disconnect();
-  };
-}, []);
+    const handleConnect = () => setConnected(true);
+    const handleDisconnect = () => setConnected(false);
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.disconnect();
+    };
+  }, []);
 
   async function handleCreateBoard() {
     if (!newBoard.trim()) return;
 
     await createBoard(newBoard);
-
     setNewBoard("");
-
     loadBoards();
   }
 
@@ -101,6 +91,10 @@ const [newCardStatus, setNewCardStatus] = useState<
 
     await deleteBoard(id);
 
+    if (selectedBoard?.id === id) {
+      setSelectedBoard(null);
+    }
+
     loadBoards();
   }
 
@@ -108,11 +102,8 @@ const [newCardStatus, setNewCardStatus] = useState<
     if (!editingBoard) return;
 
     await updateBoard(editingBoard.id, editTitle);
-
     setEditingBoard(null);
-
     setEditTitle("");
-
     loadBoards();
   }
 
@@ -124,83 +115,31 @@ const [newCardStatus, setNewCardStatus] = useState<
     }
   }
 
-  async function handleCreateCard() {
-  if (!selectedBoard) return;
-
-  if (!newCardTitle.trim()) return;
-
-  await createCard({
-    title: newCardTitle,
-    description: newCardDescription,
-    status: newCardStatus,
-    boardId: selectedBoard.id,
-  });
-
-  setNewCardTitle("");
-  setNewCardDescription("");
-  setNewCardStatus("TODO");
-
-  loadCards(selectedBoard.id);
-}
-async function handleEditCard(card: Card) {
-  console.log("EDIT",card);
-  const title = prompt("Title:", card.title);
-
-  if (title === null) return;
-
-  const description = prompt(
-    "Description:",
-    card.description ?? ""
-  );
-
-  if (description === null) return;
-
-  const status = prompt(
-    "Status (TODO, IN_PROGRESS, DONE):",
-    card.status
-  );
-
-  if (status === null) return;
-
-  if (
-    status !== "TODO" &&
-    status !== "IN_PROGRESS" &&
-    status !== "DONE"
-  ) {
-    alert("Status invalid!");
-    return;
+  function openNewCardModal() {
+    setEditingCard(null);
+    setModalOpen(true);
   }
 
-  await updateCard(card.id, {
-    title,
-    description,
-    status,
-  });
-
-  if (selectedBoard) {
-    loadCards(selectedBoard.id);
+  function openEditCardModal(card: Card) {
+    setEditingCard(card);
+    setModalOpen(true);
   }
-}
 
-  async function handleUpdateCard() {
-  if (!editingCard) return;
-
-  await updateCard(editingCard.id, {
-    title: cardTitle,
-    description: cardDescription,
-    status: cardStatus,
-  });
-
-  setEditingCard(null);
-
-  if (selectedBoard) {
-    loadCards(selectedBoard.id);
+  function handleCardSaved() {
+    if (selectedBoard) {
+      loadCards(selectedBoard.id);
+    }
   }
-}
+
+  const columns: { index: string; title: string; status: Card["status"] }[] = [
+    { index: "01", title: "Todo", status: "TODO" },
+    { index: "02", title: "In progress", status: "IN_PROGRESS" },
+    { index: "03", title: "Done", status: "DONE" },
+  ];
 
   return (
     <>
-      <Navbar />
+      <Navbar connected={connected} />
 
       <div className="dashboard">
         <Sidebar
@@ -217,124 +156,68 @@ async function handleEditCard(card: Card) {
         <main className="board-area">
           <div className="board-header">
             <h1>
-              {selectedBoard
-                ? selectedBoard.title
-                : "Selectează un board"}
+              {selectedBoard ? selectedBoard.title : "Selectează un board"}
             </h1>
-
-            <div className="create-card">
-
-  <input
-    placeholder="Card title..."
-    value={newCardTitle}
-    onChange={(e) => setNewCardTitle(e.target.value)}
-  />
-
-  <textarea
-    placeholder="Description..."
-    value={newCardDescription}
-    onChange={(e) => setNewCardDescription(e.target.value)}
-  />
-
-  <select
-    value={newCardStatus}
-    onChange={(e) =>
-      setNewCardStatus(
-        e.target.value as "TODO" | "IN_PROGRESS" | "DONE"
-      )
-    }
-  >
-    <option value="TODO">TODO</option>
-    <option value="IN_PROGRESS">IN PROGRESS</option>
-    <option value="DONE">DONE</option>
-  </select>
-
-  <button onClick={handleCreateCard}>
-    Add Card
-  </button>
-
-</div>
 
             <div className="new-board">
               <input
-                placeholder="Board title..."
+                placeholder="Board nou..."
                 value={newBoard}
                 onChange={(e) => setNewBoard(e.target.value)}
               />
 
-              <button onClick={handleCreateBoard}>
-                Create
+              <button className="primary" onClick={handleCreateBoard}>
+                Create board
               </button>
             </div>
-
           </div>
 
           {editingBoard && (
-            <div className="new-board">
+            <div className="new-board" style={{ marginBottom: 20 }}>
               <input
                 value={editTitle}
-                onChange={(e) =>
-                  setEditTitle(e.target.value)
-                }
+                onChange={(e) => setEditTitle(e.target.value)}
               />
 
-              <button onClick={handleUpdateBoard}>
+              <button className="primary" onClick={handleUpdateBoard}>
                 Save
               </button>
 
-              <button
-                onClick={() => setEditingBoard(null)}
-              >
-                Cancel
-              </button>
+              <button onClick={() => setEditingBoard(null)}>Cancel</button>
             </div>
           )}
 
-          <div className="columns">
-            <BoardColumn
-              title="TODO"
-              cards={cards.filter(
-                (c) => c.status === "TODO"
-              )}
-              onDelete={handleDeleteCard}
-              onAdd={() => {}}
-              onEdit={
-                handleEditCard
-              }
-            />
-
-            <BoardColumn
-              title="IN PROGRESS"
-              cards={cards.filter(
-                (c) => c.status === "IN_PROGRESS"
-              )}
-              onDelete={handleDeleteCard}
-              onAdd={() => {}}
-              onEdit={(card) => {
-                setEditingCard(card);
-                setCardTitle(card.title);
-                setCardDescription(card.description ?? "");
-                setCardStatus(card.status);
-              }}
-            />
-
-            <BoardColumn
-              title="DONE"
-              cards={cards.filter(
-                (c) => c.status === "DONE"
-              )}
-              onDelete={handleDeleteCard}
-              onAdd={() => {}}
-              onEdit={(card) => {
-                setEditingCard(card);
-                setCardTitle(card.title);
-                setCardDescription(card.description ?? "");
-                setCardStatus(card.status);
-              }}
-            />
-          </div>
+          {selectedBoard ? (
+            <div className="columns">
+              {columns.map((col) => (
+                <BoardColumn
+                  key={col.status}
+                  index={col.index}
+                  title={col.title}
+                  cards={cards.filter((c) => c.status === col.status)}
+                  onDelete={handleDeleteCard}
+                  onEdit={openEditCardModal}
+                  onAdd={openNewCardModal}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="board-header-empty">
+              Creează sau selectează un board pentru a vedea cardurile.
+            </p>
+          )}
         </main>
       </div>
+
+      {selectedBoard && (
+        <CardModal
+          open={modalOpen}
+          boardId={selectedBoard.id}
+          card={editingCard}
+          onClose={() => setModalOpen(false)}
+          onSaved={handleCardSaved}
+        />
+      )}
     </>
   );
 }

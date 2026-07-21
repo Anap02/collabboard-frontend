@@ -15,28 +15,22 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
 
     try {
       await register(form);
 
-      alert("Cont creat cu succes!");
-
       navigate("/login");
     } catch (err: any) {
-          console.log(err);
-  console.log(err.response);
-      setError(
-        err.response?.data?.message || "A apărut o eroare."
-      );
+      setError(err.response?.data?.message || "A apărut o eroare.");
     }
   };
 
   return (
     <div className="auth-container">
       <form className="auth-box" onSubmit={handleSubmit}>
-
+        <span className="auth-eyebrow">Task board, wired for real time</span>
         <h1>CollabBoard</h1>
-
         <h2>Register</h2>
 
         {error && <p className="error">{error}</p>}
@@ -77,24 +71,13 @@ export default function Register() {
           }
         />
 
-        <button type="submit">
-
+        <button className="primary" type="submit">
           Register
-
         </button>
 
         <p>
-
-          Ai deja cont?
-
-          <Link to="/login">
-
-            Login
-
-          </Link>
-
+          Ai deja cont? <Link to="/login">Login</Link>
         </p>
-
       </form>
     </div>
   );

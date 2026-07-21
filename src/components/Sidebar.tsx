@@ -18,17 +18,24 @@ export default function Sidebar({
 }: Props) {
   return (
     <aside className="sidebar">
-      <h2>Boards</h2>
+      <span className="sidebar-eyebrow">Boards ({boards.length})</span>
 
       {boards.map((board) => (
         <BoardCard
           key={board.id}
           board={board}
+          active={selectedBoard?.id === board.id}
           onSelect={onSelect}
           onEdit={onEdit}
           onDelete={onDelete}
         />
       ))}
+
+      {boards.length === 0 && (
+        <span className="board-header-empty">
+          Niciun board încă — creează unul din dreapta.
+        </span>
+      )}
     </aside>
   );
 }

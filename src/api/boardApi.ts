@@ -3,6 +3,7 @@ import api from "./axios";
 export interface Board {
   id: number;
   title: string;
+  ownerId?: number;
 }
 
 export const getBoards = () => api.get<Board[]>("/boards");

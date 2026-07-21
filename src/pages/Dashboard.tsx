@@ -5,6 +5,7 @@ import Sidebar from "../components/Sidebar";
 import BoardColumn from "../components/BoardColumn";
 import CardModal from "../components/CardModal";
 import { socket } from "../api/socket";
+import { importCsv } from "../api/importApi";
 
 import type { Board } from "../api/boardApi";
 import type { Card } from "../api/cardApi";
@@ -30,6 +31,7 @@ export default function Dashboard() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Card | null>(null);
+  const [importing, setImporting] = useState(false);
 
   async function loadBoards() {
     const res = await getBoards();
@@ -47,7 +49,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadBoards();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   useEffect(() => {
@@ -56,8 +58,42 @@ export default function Dashboard() {
     }
   }, [selectedBoard]);
 
-  // Conexiune WebSocket autentificată (JWT trimis în handshake).
-  // Indicatorul "Live"/"Offline" din Navbar reflectă starea reală a socket-ului.
+  
+  useEffect(() => {
+    if (!selectedBoard) return;
+
+    socket.emit("joinBoard", selectedBoard.id);
+
+    
+    const handleReconnect = () => socket.emit("joinBoard", selectedBoard.id);
+    socket.on("connect", handleReconnect);
+
+    const handleCardCreated = (card: Card) => {
+      if (card.boardId !== selectedBoard.id) return;
+      setCards((prev) => [...prev, card]);
+    };
+
+    const handleCardUpdated = (card: Card) => {
+      if (card.boardId !== selectedBoard.id) return;
+      setCards((prev) => prev.map((c) => (c.id === card.id ? card : c)));
+    };
+
+    const handleCardDeleted = ({ id }: { id: number }) => {
+      setCards((prev) => prev.filter((c) => c.id !== id));
+    };
+
+    socket.on("cardCreated", handleCardCreated);
+    socket.on("cardUpdated", handleCardUpdated);
+    socket.on("cardDeleted", handleCardDeleted);
+
+    return () => {
+      socket.off("connect", handleReconnect);
+      socket.off("cardCreated", handleCardCreated);
+      socket.off("cardUpdated", handleCardUpdated);
+      socket.off("cardDeleted", handleCardDeleted);
+    };
+  }, [selectedBoard]);
+
   useEffect(() => {
     socket.auth = {
       token: localStorage.getItem("token"),
@@ -85,6 +121,24 @@ export default function Dashboard() {
     setNewBoard("");
     loadBoards();
   }
+
+  async function handleImport(file: File) {
+  if (!selectedBoard) return;
+
+  try {
+    setImporting(true);
+
+    await importCsv(selectedBoard.id, file);
+
+    alert("Import pornit cu succes!");
+
+  } catch (err) {
+    console.error(err);
+    alert("Importul a eșuat.");
+  } finally {
+    setImporting(false);
+  }
+}
 
   async function handleDeleteBoard(id: number) {
     if (!window.confirm("Ștergi board-ul?")) return;
@@ -169,6 +223,34 @@ export default function Dashboard() {
               <button className="primary" onClick={handleCreateBoard}>
                 Create board
               </button>
+
+              {selectedBoard && (
+    <>
+      <input
+        id="csvUpload"
+        type="file"
+        accept=".csv"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+
+          if (file) {
+            handleImport(file);
+          }
+        }}
+      />
+
+      <button
+        className="primary"
+        disabled={importing}
+        onClick={() =>
+          document.getElementById("csvUpload")?.click()
+        }
+      >
+        {importing ? "Importing..." : "Import CSV"}
+      </button>
+    </>
+  )}
             </div>
           </div>
 

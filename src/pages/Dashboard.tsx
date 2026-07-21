@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Card | null>(null);
   const [importing, setImporting] = useState(false);
-
+  const [importProgress, setImportProgress] = useState(0);
   async function loadBoards() {
     const res = await getBoards();
     setBoards(res.data);
@@ -82,15 +82,28 @@ export default function Dashboard() {
       setCards((prev) => prev.filter((c) => c.id !== id));
     };
 
+    const handleImportProgress = ({progress,}: { progress: number;}) => {
+      setImportProgress(progress);
+
+  if (progress === 100) {
+    setImporting(false);
+
+    if (selectedBoard) {
+      loadCards(selectedBoard.id);
+    }
+  }
+};
+
     socket.on("cardCreated", handleCardCreated);
     socket.on("cardUpdated", handleCardUpdated);
     socket.on("cardDeleted", handleCardDeleted);
-
+    socket.on("importProgress", handleImportProgress);
     return () => {
       socket.off("connect", handleReconnect);
       socket.off("cardCreated", handleCardCreated);
       socket.off("cardUpdated", handleCardUpdated);
       socket.off("cardDeleted", handleCardDeleted);
+      socket.off("importProgress", handleImportProgress);
     };
   }, [selectedBoard]);
 
@@ -127,17 +140,22 @@ export default function Dashboard() {
 
   try {
     setImporting(true);
+    setImportProgress(0);
+    const response = await importCsv(selectedBoard.id, file);
 
-    await importCsv(selectedBoard.id, file);
+    if (response.data.invalidCount > 0) {
+      alert(`Importul conține ${response.data.invalidCount} rânduri invalide.`);
 
-    alert("Import pornit cu succes!");
+      setImporting(false);
+     setImportProgress(0);
+
+      return;
+}
 
   } catch (err) {
     console.error(err);
     alert("Importul a eșuat.");
-  } finally {
-    setImporting(false);
-  }
+  } 
 }
 
   async function handleDeleteBoard(id: number) {
@@ -240,15 +258,45 @@ export default function Dashboard() {
         }}
       />
 
-      <button
-        className="primary"
-        disabled={importing}
-        onClick={() =>
-          document.getElementById("csvUpload")?.click()
-        }
-      >
-        {importing ? "Importing..." : "Import CSV"}
-      </button>
+     <button
+  className="primary"
+  disabled={importing}
+  onClick={() =>
+    document.getElementById("csvUpload")?.click()
+  }
+>
+  {importing ? "Importing..." : "Import CSV"}
+</button>
+
+{importing && (
+  <div
+    style={{
+      width: 250,
+      marginTop: 10,
+    }}
+  >
+    <div
+      style={{
+        width: "100%",
+        height: 10,
+        background: "#ddd",
+        borderRadius: 5,
+      }}
+    >
+      <div
+        style={{
+          width: `${importProgress}%`,
+          height: "100%",
+          background: "#4caf50",
+          borderRadius: 5,
+          transition: "width .3s",
+        }}
+      />
+    </div>
+
+    <p>{importProgress}%</p>
+  </div>
+)}
     </>
   )}
             </div>

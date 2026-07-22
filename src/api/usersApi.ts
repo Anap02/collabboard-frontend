@@ -7,3 +7,4 @@ export interface AppUser {
 }
 
 export const getUsers = () => api.get<AppUser[]>("/users");
+export const getProfile = () => api.get<AppUser>("/users/profile");

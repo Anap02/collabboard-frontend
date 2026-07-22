@@ -5,7 +5,7 @@ type Props = {
 };
 
 export default function Navbar({ connected = false }: Props) {
-  const { logout } = useAuth();
+  const { user ,logout } = useAuth();
 
   return (
     <nav className="navbar">
@@ -19,6 +19,8 @@ export default function Navbar({ connected = false }: Props) {
           <span className="live-dot" />
           {connected ? "Live" : "Offline"}
         </span>
+
+       {user && <span className="navbar-user">{user.name}</span>}
 
         <button className="ghost" onClick={logout}>
           Logout

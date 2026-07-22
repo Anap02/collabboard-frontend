@@ -157,6 +157,12 @@ button.danger:hover {
   background: var(--muted-2);
 }
 
+.navbar-user {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--paper);
+}
+
 .live-status.connected {
   color: var(--status-done);
   border-color: rgba(55, 217, 155, 0.35);

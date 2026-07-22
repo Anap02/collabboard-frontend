@@ -1,8 +1,11 @@
-import { createContext, useContext, useState} from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
+import { getProfile } from "../api/usersApi";
+import type { AppUser } from "../api/usersApi";
 
 type AuthContextType = {
   token: string | null;
+  user: AppUser | null;
   isAuthenticated: boolean;
   login: (token: string) => void;
   logout: () => void;
@@ -18,6 +21,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(
     localStorage.getItem("token")
   );
+  const [user, setUser] = useState<AppUser | null>(null);
+
+  
+  useEffect(() => {
+    if (!token) {
+      setUser(null);
+      return;
+    }
+
+    getProfile()
+      .then((res) => setUser(res.data))
+      .catch(() => {
+       
+        setUser(null);
+      });
+  }, [token]);
 
   const login = (jwt: string) => {
     localStorage.setItem("token", jwt);
@@ -27,12 +46,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = () => {
     localStorage.removeItem("token");
     setToken(null);
+    setUser(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         token,
+        user,
         login,
         logout,
         isAuthenticated: !!token,
